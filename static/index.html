@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SOC Dashboard | Network Intrusion Detection System</title>
+    
+    <!-- TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+        
+        .pulse-dot {
+            box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+            animation: pulse-green 2s infinite;
+        }
+        @keyframes pulse-green {
+            0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        }
+        
+        .pulse-red {
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+            animation: pulse-red-anim 1.5s infinite;
+        }
+        @keyframes pulse-red-anim {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        .fade-in-row {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            0% { opacity: 0; transform: translateY(-5px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+
+        .shap-bar-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 0.875rem;
+        }
+        .shap-bar-bg {
+            flex-grow: 1;
+            background: #374151;
+            border-radius: 4px;
+            height: 8px;
+            margin: 0 8px;
+            position: relative;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200 font-sans antialiased">
+
+    <!-- Header -->
+    <header class="bg-gray-800 border-b border-gray-700 sticky top-0 z-50 shadow-md">
+        <div class="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between flex-wrap gap-4">
+            <div class="flex items-center space-x-3">
+                <i data-lucide="shield-alert" class="w-8 h-8 text-indigo-400"></i>
+                <div>
+                    <h1 class="text-xl font-bold text-white">NIDS SOC Dashboard</h1>
+                    <p class="text-xs text-gray-400">Real-time Threat Detection & Mitigation</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-4">
+                <div class="flex items-center space-x-2 bg-gray-900 px-3 py-1.5 rounded-lg border border-gray-700">
+                    <div id="conn-status" class="w-3 h-3 rounded-full bg-gray-500 pulse-red"></div>
+                    <span id="conn-text" class="text-sm font-medium text-gray-400">Disconnected</span>
+                </div>
+                
+                <div class="hidden md:flex items-center space-x-2 bg-gray-900 px-3 py-1.5 rounded-lg border border-gray-700">
+                    <i data-lucide="network" class="w-4 h-4 text-cyan-400"></i>
+                    <span class="text-sm font-medium">Interface: <span id="interface-name" class="text-cyan-300">lo</span></span>
+                </div>
+                
+                <button id="pause-btn" class="flex items-center space-x-2 bg-yellow-600 hover:bg-yellow-500 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+                    <i data-lucide="pause" class="w-4 h-4"></i>
+                    <span id="pause-text">Pause</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        
+        <!-- Top Stats Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div class="bg-gray-800 rounded-xl p-5 border border-gray-700 shadow-lg flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-400 font-medium mb-1">Total Flows Analyzed</p>
+                    <h2 id="stat-flows" class="text-3xl font-bold text-white">0</h2>
+                </div>
+                <div class="p-3 bg-blue-500/10 rounded-full"><i data-lucide="activity" class="w-6 h-6 text-blue-400"></i></div>
+            </div>
+            <div class="bg-gray-800 rounded-xl p-5 border border-gray-700 shadow-lg flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-400 font-medium mb-1">Attacks Detected</p>
+                    <h2 id="stat-attacks" class="text-3xl font-bold text-red-400">0</h2>
+                </div>
+                <div class="p-3 bg-red-500/10 rounded-full"><i data-lucide="siren" class="w-6 h-6 text-red-400"></i></div>
+            </div>
+            <div class="bg-gray-800 rounded-xl p-5 border border-gray-700 shadow-lg flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-400 font-medium mb-1">Active Quarantines</p>
+                    <h2 id="stat-quarantines" class="text-3xl font-bold text-yellow-400">0</h2>
+                </div>
+                <div class="p-3 bg-yellow-500/10 rounded-full"><i data-lucide="ban" class="w-6 h-6 text-yellow-400"></i></div>
+            </div>
+            <div class="bg-gray-800 rounded-xl p-5 border border-gray-700 shadow-lg flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-400 font-medium mb-1">System Health</p>
+                    <h2 id="stat-health" class="text-3xl font-bold text-green-400">ONLINE</h2>
+                </div>
+                <div class="p-3 bg-green-500/10 rounded-full"><i data-lucide="server-check" class="w-6 h-6 text-green-400"></i></div>
+            </div>
+        </div>
+
+        <!-- Middle Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <!-- Live Traffic Chart -->
+            <div class="lg:col-span-2 bg-gray-800 rounded-xl p-5 border border-gray-700 shadow-lg">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-white flex items-center">
+                        <i data-lucide="line-chart" class="w-5 h-5 text-indigo-400 mr-2"></i>
+                        Traffic Volume & Anomaly Monitor
+                    </h3>
+                    <span class="text-xs text-gray-400">Last 30s (pkts/sec)</span>
+                </div>
+                <div class="h-64 relative">
+                    <canvas id="trafficChart"></canvas>
+                </div>
+            </div>
+
+            <!-- XAI Panel -->
+            <div class="bg-gray-800 rounded-xl p-5 border border-gray-700 shadow-lg flex flex-col">
+                <h3 class="text-lg font-semibold text-white flex items-center mb-4">
+                    <i data-lucide="brain-circuit" class="w-5 h-5 text-purple-400 mr-2"></i>
+                    Explainable AI (XAI) Inspection
+                </h3>
+                <div id="xai-empty" class="flex-1 flex flex-col items-center justify-center text-center text-gray-500">
+                    <i data-lucide="mouse-pointer-click" class="w-10 h-10 mb-2 opacity-50"></i>
+                    <p class="text-sm">Select an alert from the feed to inspect SHAP attributions.</p>
+                </div>
+                <div id="xai-content" class="hidden flex-1 overflow-y-auto pr-2">
+                    <div class="mb-4 p-3 bg-gray-900 rounded-lg border border-gray-700">
+                        <div class="flex justify-between text-xs text-gray-400 mb-1">
+                            <span>5-Tuple:</span>
+                            <span id="xai-tuple" class="text-white font-mono"></span>
+                        </div>
+                        <div class="flex justify-between text-xs text-gray-400 mb-1">
+                            <span>Class / Conf:</span>
+                            <span id="xai-class" class="text-white font-medium"></span>
+                        </div>
+                        <div class="flex justify-between text-xs text-gray-400 mb-1">
+                            <span>Risk Score:</span>
+                            <span id="xai-risk" class="text-white font-medium"></span>
+                        </div>
+                    </div>
+                    <h4 class="text-sm font-semibold text-gray-300 mb-2">Rationale</h4>
+                    <p id="xai-text" class="text-xs text-gray-400 mb-4 italic"></p>
+                    <h4 class="text-sm font-semibold text-gray-300 mb-2">Top Feature Contributions</h4>
+                    <div id="shap-bars"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Live Alerts Table -->
+            <div class="lg:col-span-2 bg-gray-800 rounded-xl border border-gray-700 shadow-lg flex flex-col">
+                <div class="p-5 border-b border-gray-700 flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-white flex items-center">
+                        <i data-lucide="bell" class="w-5 h-5 text-red-400 mr-2"></i>
+                        Live Alert Feed
+                    </h3>
+                    <span class="text-xs text-gray-400">Max 100 rows retained</span>
+                </div>
+                <div class="overflow-auto max-h-[500px]">
+                    <table class="w-full text-sm text-left text-gray-300">
+                        <thead class="text-xs text-gray-400 uppercase bg-gray-900 sticky top-0">
+                            <tr>
+                                <th class="px-4 py-3">Time</th>
+                                <th class="px-4 py-3">Connection (Src -> Dst)</th>
+                                <th class="px-4 py-3">Type</th>
+                                <th class="px-4 py-3">Conf.</th>
+                                <th class="px-4 py-3">Risk</th>
+                                <th class="px-4 py-3">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="alerts-tbody">
+                            <!-- Rows injected here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Quarantine Management -->
+            <div class="bg-gray-800 rounded-xl border border-gray-700 shadow-lg flex flex-col">
+                <div class="p-5 border-b border-gray-700 flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-white flex items-center">
+                        <i data-lucide="fire-extinguisher" class="w-5 h-5 text-yellow-400 mr-2"></i>
+                        Quarantine List
+                    </h3>
+                </div>
+                <div class="p-4 overflow-auto max-h-[500px] space-y-3" id="quarantine-list">
+                    <!-- Cards injected here -->
+                    <div class="text-center text-gray-500 py-8 text-sm">
+                        No active quarantines
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // Global State
+        let socket = null;
+        let retryCount = 0;
+        let isPaused = false;
+        let trafficChart = null;
+        let activeAlerts = []; // Store last 100 alerts for XAI click
+        let quarantineInterval = null;
+
+        // DOM Elements
+        const connStatus = document.getElementById('conn-status');
+        const connText = document.getElementById('conn-text');
+        const interfaceName = document.getElementById('interface-name');
+        const pauseBtn = document.getElementById('pause-btn');
+        const pauseText = document.getElementById('pause-text');
+        const statFlows = document.getElementById('stat-flows');
+        const statAttacks = document.getElementById('stat-attacks');
+        const statQuarantines = document.getElementById('stat-quarantines');
+        const alertsTbody = document.getElementById('alerts-tbody');
+        const quarantineList = document.getElementById('quarantine-list');
+
+        // Badge Classes
+        const riskClasses = {
+            "LOW": "bg-gray-200 text-gray-800",
+            "MEDIUM": "bg-yellow-200 text-yellow-800",
+            "HIGH": "bg-orange-500 text-white",
+            "CRITICAL": "bg-red-600 text-white"
+        };
+        const attackClasses = {
+            "Benign": "bg-green-200 text-green-800",
+            "Recon": "bg-blue-200 text-blue-800",
+            "DoS": "bg-orange-200 text-orange-800",
+            "Malware": "bg-red-200 text-red-800",
+            "Botnet": "bg-purple-200 text-purple-800"
+        };
+
+        // Initialize Chart
+        function initChart() {
+            const ctx = document.getElementById('trafficChart').getContext('2d');
+            trafficChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Array(30).fill(""),
+                    datasets: [
+                        {
+                            label: 'Normal Traffic',
+                            data: Array(30).fill(0),
+                            borderColor: 'rgb(34, 197, 94)',
+                            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 0
+                        },
+                        {
+                            label: 'Anomalous Traffic',
+                            data: Array(30).fill(0),
+                            borderColor: 'rgb(239, 68, 68)',
+                            backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 0
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: true, labels: { color: '#cbd5e1' } }
+                    },
+                    scales: {
+                        x: { 
+                            grid: { color: '#374151' },
+                            ticks: { display: false } 
+                        },
+                        y: { 
+                            grid: { color: '#374151' },
+                            ticks: { color: '#9ca3af' },
+                            beginAtZero: true 
+                        }
+                    }
+                }
+            });
+        }
+
+        // Update Chart
+        function updateChart(packetRate, isAttack) {
+            if (!trafficChart) return;
+            
+            if (isAttack) {
+                trafficChart.data.datasets[1].data.push(packetRate);
+                trafficChart.data.datasets[0].data.push(0);
+            } else {
+                trafficChart.data.datasets[0].data.push(packetRate);
+                trafficChart.data.datasets[1].data.push(0);
+            }
+
+            trafficChart.data.datasets[0].data.shift();
+            trafficChart.data.datasets[1].data.shift();
+            trafficChart.data.labels.push("");
+            trafficChart.data.labels.shift();
+            
+            trafficChart.update('none'); // Skip animations for performance
+        }
+
+        // Format Time
+        function formatTime(isoStr) {
+            const d = new Date(isoStr);
+            return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+
+        // Add Alert Row
+        function addAlertRow(event) {
+            const isAttack = event.predicted_class !== 0;
+            
+            // Store for XAI
+            event._id = Math.random().toString(36).substr(2, 9);
+            activeAlerts.unshift(event);
+            if (activeAlerts.length > 100) activeAlerts.pop();
+
+            const row = document.createElement('tr');
+            row.className = `border-b border-gray-700 hover:bg-gray-700 cursor-pointer transition-colors ${isAttack ? 'fade-in-row bg-gray-900/50' : ''}`;
+            row.onclick = () => selectAlert(event._id);
+            
+            row.innerHTML = `
+                <td class="px-4 py-2 text-xs text-gray-400">${formatTime(event.timestamp)}</td>
+                <td class="px-4 py-2 font-mono text-xs">
+                    <span class="text-blue-400">${event.src_ip}:${event.src_port}</span>
+                    <span class="text-gray-500 mx-1">-></span>
+                    <span class="text-purple-400">${event.dst_ip}:${event.dst_port}</span>
+                </td>
+                <td class="px-4 py-2">
+                    <span class="px-2 py-1 text-xs rounded-full ${attackClasses[event.attack_type] || 'bg-gray-200'}">${event.attack_type}</span>
+                </td>
+                <td class="px-4 py-2 text-xs text-gray-300">${(event.confidence * 100).toFixed(1)}%</td>
+                <td class="px-4 py-2">
+                    <span class="px-2 py-1 text-xs rounded-full ${riskClasses[event.risk_tier] || 'bg-gray-200'}">${event.risk_tier}</span>
+                </td>
+                <td class="px-4 py-2 text-xs font-medium text-gray-400">${event.action_taken}</td>
+            `;
+            
+            alertsTbody.prepend(row);
+            
+            // Limit rows to 100 to prevent memory leaks
+            while (alertsTbody.rows.length > 100) {
+                alertsTbody.deleteRow(alertsTbody.rows.length - 1);
+            }
+        }
+
+        // Handle XAI Row Selection
+        function selectAlert(id) {
+            const event = activeAlerts.find(e => e._id === id);
+            if (!event) return;
+
+            document.getElementById('xai-empty').classList.add('hidden');
+            const xaiContent = document.getElementById('xai-content');
+            xaiContent.classList.remove('hidden');
+
+            document.getElementById('xai-tuple').innerText = `${event.src_ip}:${event.src_port} -> ${event.dst_ip}:${event.dst_port}`;
+            document.getElementById('xai-class').innerText = `${event.attack_type} (${(event.confidence * 100).toFixed(1)}%)`;
+            document.getElementById('xai-risk').innerText = `${event.risk_score} (${event.risk_tier})`;
+            document.getElementById('xai-text').innerText = event.explanation_text || "No explanation available.";
+
+            const shapBars = document.getElementById('shap-bars');
+            shapBars.innerHTML = '';
+
+            if (!event.top_features || event.top_features.length === 0) {
+                shapBars.innerHTML = '<p class="text-xs text-gray-500">No feature attributions available (Benign flow).</p>';
+                return;
+            }
+
+            const maxVal = Math.max(...event.top_features.map(f => Math.abs(f.shap_value))) || 1;
+
+            event.top_features.forEach(f => {
+                const width = (Math.abs(f.shap_value) / maxVal) * 100;
+                const color = f.direction === "increases_risk" ? "bg-red-500" : "bg-blue-500";
+                const align = f.direction === "increases_risk" ? "ml-auto" : "mr-auto";
+                
+                const container = document.createElement('div');
+                container.className = 'shap-bar-container';
+                container.innerHTML = `
+                    <span class="text-xs text-gray-400 w-16 truncate">${f.feature_name}</span>
+                    <div class="shap-bar-bg">
+                        <div class="${color} h-8 rounded ${align}" style="width: ${width}%; opacity: 0.8;"></div>
+                    </div>
+                    <span class="text-xs text-gray-300 w-12 text-right">${f.shap_value.toFixed(3)}</span>
+                `;
+                shapBars.appendChild(container);
+            });
+        }
+
+        // Handle Incoming WebSocket Message
+        function handleMessage(event) {
+            const data = JSON.parse(event.data);
+            
+            // Update Charts and Stats
+            statFlows.innerText = parseInt(statFlows.innerText) + 1;
+            const isAttack = data.predicted_class !== 0;
+            if (isAttack) {
+                statAttacks.innerText = parseInt(statAttacks.innerText) + 1;
+            }
+            updateChart(data.packet_rate, isAttack);
+            
+            // Add to Table
+            addAlertRow(data);
+        }
+
+        // Fetch Quarantine List
+        async function fetchQuarantine() {
+            try {
+                const res = await fetch('/api/quarantine');
+                const data = await res.json();
+                renderQuarantine(data);
+                
+                // Update stat card
+                statQuarantines.innerText = data.length;
+            } catch (e) {
+                console.error("Failed to fetch quarantine", e);
+            }
+        }
+
+        // Render Quarantine Table
+        function renderQuarantine(list) {
+            if (list.length === 0) {
+                quarantineList.innerHTML = '<div class="text-center text-gray-500 py-8 text-sm">No active quarantines</div>';
+                return;
+            }
+
+            // Store remaining time for countdown
+            list.forEach(item => {
+                window[`qt_${item.src_ip}`] = item.remaining_seconds;
+            });
+
+            quarantineList.innerHTML = list.map(item => `
+                <div class="bg-gray-900 p-4 rounded-lg border border-gray-700 flex flex-col space-y-3">
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center space-x-2">
+                            <i data-lucide="ban" class="w-4 h-4 text-red-400"></i>
+                            <span class="font-mono text-white text-sm">${item.src_ip}</span>
+                        </div>
+                        <span class="text-xs bg-gray-700 px-2 py-1 rounded-full text-gray-300">${item.action || 'DROP'}</span>
+                    </div>
+                    <p class="text-xs text-gray-400 italic truncate" title="${item.reason}">${item.reason || 'N/A'}</p>
+                    <div class="flex justify-between items-center mt-1">
+                        <div class="flex items-center space-x-1 text-xs text-yellow-400">
+                            <i data-lucide="timer" class="w-3 h-3"></i>
+                            <span id="ttl_${item.src_ip}">${Math.ceil(item.remaining_seconds)}s</span>
+                        </div>
+                        <button onclick="releaseIP('${item.src_ip}')" class="flex items-center space-x-1 bg-green-600 hover:bg-green-500 text-white px-2 py-1 rounded text-xs font-medium transition-colors">
+                            <i data-lucide="unlock" class="w-3 h-3"></i>
+                            <span>Release</span>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+            
+            lucide.createIcons();
+        }
+
+        // Release IP Action
+        async function releaseIP(ip) {
+            try {
+                await fetch(`/api/quarantine/release/${ip}`, { method: 'POST' });
+                fetchQuarantine();
+            } catch (e) {
+                console.error("Failed to release IP", e);
+            }
+        }
+
+        // Countdown Timer Logic
+        function startCountdown() {
+            if (quarantineInterval) clearInterval(quarantineInterval);
+            quarantineInterval = setInterval(() => {
+                document.querySelectorAll('[id^="ttl_"]').forEach(el => {
+                    const ip = el.id.replace('ttl_', '');
+                    let time = window[`qt_${ip}`];
+                    if (time > 0) {
+                        time -= 1;
+                        window[`qt_${ip}`] = time;
+                        el.innerText = `${time}s`;
+                    } else {
+                        fetchQuarantine(); // Refresh when 0
+                    }
+                });
+            }, 1000);
+        }
+
+        // Fetch Status
+        async function fetchStatus() {
+            try {
+                const res = await fetch('/api/status');
+                const data = await res.json();
+                
+                interfaceName.innerText = data.active_interface;
+                statFlows.innerText = data.total_flows_analyzed;
+                statAttacks.innerText = data.total_threats_detected;
+                statQuarantines.innerText = data.active_mitigations;
+                
+                if (data.pipeline_paused !== isPaused) {
+                    isPaused = data.pipeline_paused;
+                    updatePauseBtn();
+                }
+            } catch(e) {
+                console.error("Failed to fetch status", e);
+            }
+        }
+
+        // Pause Button Toggle
+        pauseBtn.onclick = async () => {
+            try {
+                await fetch('/api/pipeline/toggle', { method: 'POST' });
+                isPaused = !isPaused;
+                updatePauseBtn();
+            } catch(e) {
+                console.error("Failed to toggle pipeline", e);
+            }
+        };
+
+        function updatePauseBtn() {
+            const icon = pauseBtn.querySelector('i');
+            if (isPaused) {
+                pauseBtn.classList.remove('bg-yellow-600', 'hover:bg-yellow-500');
+                pauseBtn.classList.add('bg-green-600', 'hover:bg-green-500');
+                icon.setAttribute('data-lucide', 'play');
+                pauseText.innerText = 'Resume';
+            } else {
+                pauseBtn.classList.add('bg-yellow-600', 'hover:bg-yellow-500');
+                pauseBtn.classList.remove('bg-green-600', 'hover:bg-green-500');
+                icon.setAttribute('data-lucide', 'pause');
+                pauseText.innerText = 'Pause';
+            }
+            lucide.createIcons();
+        }
+
+        // WebSocket Connect
+        function connectWebSocket() {
+            const ws_scheme = window.location.protocol === "https:" ? "wss://" : "ws://";
+            const wsUrl = ws_scheme + window.location.host + "/ws/telemetry";
+            
+            socket = new WebSocket(wsUrl);
+
+            socket.onopen = () => {
+                retryCount = 0;
+                connStatus.classList.remove('bg-gray-500', 'pulse-red');
+                connStatus.classList.add('bg-green-500', 'pulse-dot');
+                connText.innerText = 'Connected';
+                connText.classList.remove('text-gray-400');
+                connText.classList.add('text-green-400');
+            };
+
+            socket.onmessage = handleMessage;
+
+            socket.onclose = (e) => {
+                connStatus.classList.remove('bg-green-500', 'pulse-dot');
+                connStatus.classList.add('bg-gray-500', 'pulse-red');
+                connText.innerText = 'Disconnected';
+                connText.classList.remove('text-green-400');
+                connText.classList.add('text-gray-400');
+                
+                retryCount++;
+                const timeout = Math.min(10000, retryCount * 1000);
+                setTimeout(connectWebSocket, timeout);
+            };
+
+            socket.onerror = (err) => {
+                console.error("WebSocket Error:", err);
+                socket.close();
+            };
+        }
+
+        // Initialization
+        window.onload = () => {
+            lucide.createIcons();
+            initChart();
+            fetchStatus();
+            fetchQuarantine();
+            startCountdown();
+            connectWebSocket();
+            
+            // Poll status every 5s
+            setInterval(fetchStatus, 5000);
+            setInterval(fetchQuarantine, 10000); // Backup sync for quarantines
+        };
+    </script>
+</body>
+</html>
