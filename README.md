@@ -1,4 +1,4 @@
-# Autonomous IoT-23 Network Intrusion Detection & Response System (NIDS)
+# Autonomous IoT-23 Network Intrusion Detection & Response System (NIDS) aka Net Attack Deduction (NAD)
 
 [![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.1%2B-ee4c2c.svg)](https://pytorch.org/)
